@@ -4,52 +4,51 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from purify.core.checks import require_admin
 
-
-class Security(commands.Cog):
+class Leveling(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-    security = app_commands.Group(name="security", description="Security tools")
+    @app_commands.command(name="levelsetup")
+    async def levelsetup(self, interaction: discord.Interaction) -> None:
+        await interaction.response.send_message("Leveling system initialized. XP, role rewards, and channel filters can be configured here.", ephemeral=True)
 
-    @security.command(name="status")
-    async def status(self, interaction: discord.Interaction) -> None:
-        if not await require_admin(interaction):
-            return
-        embed = discord.Embed(title="PURIFY Security", color=discord.Color.green())
-        embed.add_field(name="Anti-Nuke", value="Enabled")
-        embed.add_field(name="Anti-Raid", value="Enabled")
-        embed.add_field(name="Anti-Link", value="Enabled")
-        embed.add_field(name="Anti-Spam", value="Enabled")
+    @app_commands.command(name="rank")
+    @app_commands.describe(user="User to inspect")
+    async def rank(self, interaction: discord.Interaction, user: discord.Member | None = None) -> None:
+        target = user or interaction.user
+        xp, level = self.bot.db.get_xp(interaction.guild_id, target.id)
+        embed = discord.Embed(title=f"{target.name}'s Rank", color=discord.Color.gold())
+        embed.add_field(name="Level", value=str(level))
+        embed.add_field(name="XP", value=str(xp))
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @security.command(name="antinuke")
-    @app_commands.describe(action="setup, enable, disable")
-    async def antinuke(self, interaction: discord.Interaction, action: str) -> None:
-        if not await require_admin(interaction):
-            return
-        await interaction.response.send_message(f"Anti-nuke action queued: `{action}`. Security configuration scaffold ready.", ephemeral=True)
+    @app_commands.command(name="leaderboard")
+    async def leaderboard(self, interaction: discord.Interaction) -> None:
+        await interaction.response.send_message("Leaderboard ready for extension and XP reward configuration.", ephemeral=True)
 
-    @app_commands.command(name="antiraidsetup")
-    async def antiraidsetup(self, interaction: discord.Interaction) -> None:
-        if not await require_admin(interaction):
-            return
-        await interaction.response.send_message("Anti-raid setup initialized. Join thresholds, verification mode, and lockdown actions can be configured here.", ephemeral=True)
+    xp = app_commands.Group(name="xp", description="XP management")
 
-    @app_commands.command(name="antilinksetup")
-    async def antilinksetup(self, interaction: discord.Interaction) -> None:
-        if not await require_admin(interaction):
+    @xp.command(name="add")
+    @app_commands.describe(user="User to award XP to", amount="XP amount")
+    async def add_xp(self, interaction: discord.Interaction, user: discord.Member, amount: int) -> None:
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("Only administrators can award XP.", ephemeral=True)
             return
-        await interaction.response.send_message("Anti-link setup initialized. Invites and suspicious domains can be managed here.", ephemeral=True)
+        total_xp, level = self.bot.db.add_xp(interaction.guild_id, user.id, amount)
+        await interaction.response.send_message(f"Awarded {amount} XP to {user.mention}. New total: {total_xp}, Level: {level}", ephemeral=True)
 
-    @app_commands.command(name="quarantine")
-    @app_commands.describe(user="User to quarantine")
-    async def quarantine(self, interaction: discord.Interaction, user: discord.Member) -> None:
-        if not await require_admin(interaction):
+    @xp.command(name="remove")
+    @app_commands.describe(user="User to remove XP from", amount="XP amount")
+    async def remove_xp(self, interaction: discord.Interaction, user: discord.Member, amount: int) -> None:
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("Only administrators can remove XP.", ephemeral=True)
             return
-        await interaction.response.send_message(f"{user.mention} has been placed into quarantine workflow.", ephemeral=True)
+        current_xp, _ = self.bot.db.get_xp(interaction.guild_id, user.id)
+        new_xp = max(0, current_xp - amount)
+        self.bot.db.add_xp(interaction.guild_id, user.id, -amount)
+        await interaction.response.send_message(f"Removed {amount} XP from {user.mention}. New total: {new_xp}.", ephemeral=True)
 
 
 async def setup(bot: commands.Bot) -> None:
-    await bot.add_cog(Security(bot))
+    await bot.add_cog(Leveling(bot))

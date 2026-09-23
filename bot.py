@@ -43,6 +43,9 @@ class PurifyBot(commands.Bot):
             "purify.cogs.owner",
             "purify.cogs.music",
             "purify.cogs.voice",
+            "purify.cogs.tickets",
+            "purify.cogs.logging",
+            "purify.cogs.notifications",
         ]:
             try:
                 await self.load_extension(extension)
@@ -57,6 +60,14 @@ class PurifyBot(commands.Bot):
                 name="/help | Protecting servers | /config",
             )
         )
+
+    async def on_message(self, message: discord.Message) -> None:
+        if message.author.bot or not message.guild:
+            return
+        if not message.content:
+            return
+        self.db.add_xp(message.guild.id, message.author.id, 5)
+        await self.process_commands(message)
 
 
 bot = PurifyBot()
