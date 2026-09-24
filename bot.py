@@ -15,9 +15,8 @@ class PurifyBot(commands.Bot):
         intents.members = True
         intents.guilds = True
         intents.voice_states = True
-
         self.settings = settings
-        self.db = Database(self.settings.database_url)
+        self.db = Database(settings.database_url)
         self.logger = logger
 
         super().__init__(
@@ -30,11 +29,10 @@ class PurifyBot(commands.Bot):
     async def get_prefix(self, bot: commands.Bot, message: discord.Message):
         if message.guild is None:
             return self.settings.prefix
-        guild_prefix = self.db.get_prefix(message.guild.id)
-        return [guild_prefix, self.settings.prefix]
+        return [self.db.get_prefix(message.guild.id), self.settings.prefix]
 
     async def setup_hook(self) -> None:
-        for extension in [
+        extensions = [
             "purify.cogs.utility",
             "purify.cogs.config",
             "purify.cogs.moderation",
@@ -46,11 +44,14 @@ class PurifyBot(commands.Bot):
             "purify.cogs.tickets",
             "purify.cogs.logging",
             "purify.cogs.notifications",
-        ]:
+            "purify.cogs.errors",
+        ]
+        for extension in extensions:
             try:
                 await self.load_extension(extension)
-            except Exception as exc:  # pragma: no cover
-                self.logger.exception("Failed to load extension %s: %s", extension, exc)
+            except Exception:
+                self.logger.exception("Failed to load extension %s", extension)
+        await self.tree.sync()
 
     async def on_ready(self) -> None:
         self.logger.info("PURIFY ready. Guilds: %s", len(self.guilds))
@@ -62,16 +63,14 @@ class PurifyBot(commands.Bot):
         )
 
     async def on_message(self, message: discord.Message) -> None:
-        if message.author.bot or not message.guild:
+        if message.author.bot:
             return
-        if not message.content:
-            return
-        self.db.add_xp(message.guild.id, message.author.id, 5)
+        if message.guild:
+            self.db.add_xp(message.guild.id, message.author.id, 5)
         await self.process_commands(message)
 
 
 bot = PurifyBot()
-
 
 if __name__ == "__main__":
     bot.run(settings.token)
