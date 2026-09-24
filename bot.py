@@ -15,8 +15,9 @@ class PurifyBot(commands.Bot):
         intents.members = True
         intents.guilds = True
         intents.voice_states = True
+
         self.settings = settings
-        self.db = Database(settings.database_url)
+        self.db = Database(self.settings.database_url)
         self.logger = logger
 
         super().__init__(

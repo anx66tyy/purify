@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import re
+from collections import defaultdict, deque
 from datetime import timedelta
+from time import monotonic
 
 import discord
 from discord import app_commands
@@ -12,10 +14,10 @@ def parse_duration(raw: str) -> timedelta | None:
     if not raw:
         return None
     total = timedelta()
-    match = re.findall(r"(\d+)([smhdw])", raw.lower())
-    if not match:
+    matches = re.findall(r"(\d+)([smhdw])", raw.lower())
+    if not matches:
         return None
-    for value, unit in match:
+    for value, unit in matches:
         value = int(value)
         if unit == "s":
             total += timedelta(seconds=value)
@@ -61,9 +63,13 @@ class Moderation(commands.Cog):
         if not user_id.isdigit():
             await interaction.response.send_message("Please provide a valid Discord user ID.", ephemeral=True)
             return
-        user = await interaction.guild.fetch_ban(discord.Object(id=int(user_id)))
-        await interaction.guild.unban(user.user)
-        await interaction.response.send_message(f"Unbanned {user.user.mention}.", ephemeral=True)
+        bans = await interaction.guild.bans()
+        target = discord.utils.get(bans, user__id=int(user_id))
+        if target is None:
+            await interaction.response.send_message("That user is not currently banned.", ephemeral=True)
+            return
+        await interaction.guild.unban(target.user)
+        await interaction.response.send_message(f"Unbanned {target.user.mention}.", ephemeral=True)
 
     @mod.command(name="kick")
     @app_commands.describe(user="User to kick", reason="Reason")
@@ -91,7 +97,7 @@ class Moderation(commands.Cog):
         if td is None:
             await interaction.response.send_message("Use a valid duration such as `10m`, `1h`, or `7d`.", ephemeral=True)
             return
-        await user.timeout(td, reason=reason)
+        await user.timeout(discord.utils.utcnow() + td, reason=reason)
         await interaction.response.send_message(f"Timed out {user.mention} for {duration}.", ephemeral=True)
 
     @mod.command(name="untimeout")

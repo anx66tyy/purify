@@ -99,7 +99,6 @@ class Database:
 
     def upsert_guild(self, guild_id: int, prefix: str | None = None, settings: dict | None = None) -> None:
         current = self.get_guild(guild_id)
-        prefix_value = prefix or current["prefix"] or "."
         merged = {**current["settings"], **(settings or {})}
         with self.conn:
             self.conn.execute(
@@ -110,12 +109,11 @@ class Database:
                     prefix = excluded.prefix,
                     settings = excluded.settings
                 """,
-                (guild_id, prefix_value, json.dumps(merged, separators=(",", ":"))),
+                (guild_id, prefix or current["prefix"] or ".", json.dumps(merged, separators=(",", ":"))),
             )
 
     def get_setting(self, guild_id: int, key: str, default=None):
-        guild = self.get_guild(guild_id)
-        return guild["settings"].get(key, default)
+        return self.get_guild(guild_id)["settings"].get(key, default)
 
     def set_setting(self, guild_id: int, key: str, value) -> None:
         guild = self.get_guild(guild_id)

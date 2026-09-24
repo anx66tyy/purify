@@ -9,16 +9,16 @@ class Logging(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-    @app_commands.command(name="loggingsetup")
+    @app_commands.command(name="loggingsetup", description="Enable server logging")
     async def loggingsetup(self, interaction: discord.Interaction) -> None:
         if not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message("Only administrators can configure logging.", ephemeral=True)
             return
         self.bot.db.set_setting(interaction.guild_id, "logging_enabled", True)
-        await interaction.response.send_message("Logging system enabled. Member, moderation, moderation, message, and voice events will be tracked.", ephemeral=True)
+        await interaction.response.send_message("✅ Logging system enabled.", ephemeral=True)
 
-    @app_commands.command(name="logging")
-    @app_commands.describe(channel="Channel for logging", category="Category to target")
+    @app_commands.command(name="logging", description="Set a logging channel for a category")
+    @app_commands.describe(channel="Channel for logs", category="Category name")
     async def logging(self, interaction: discord.Interaction, channel: discord.TextChannel, category: str = "general") -> None:
         if not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message("Only administrators can configure logging channels.", ephemeral=True)

@@ -5,55 +5,39 @@ from discord import app_commands
 from discord.ext import commands
 
 
-class Utility(commands.Cog):
+class Config(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-    @commands.command(name="ping")
-    async def ping_prefix(self, ctx: commands.Context) -> None:
-        await ctx.reply(f"Pong! Latency: {round(self.bot.latency * 1000)}ms")
-
-    @app_commands.command(name="ping")
-    async def ping_slash(self, interaction: discord.Interaction) -> None:
-        await interaction.response.send_message(f"Pong! Latency: {round(self.bot.latency * 1000)}ms", ephemeral=True)
-
-    @commands.command(name="help")
-    async def help_prefix(self, ctx: commands.Context) -> None:
-        embed = discord.Embed(title="PURIFY Help", description="Use /help for the main command dashboard.", color=discord.Color.blurple())
-        embed.add_field(name="Security", value="/security status /antiraidsetup /antilinksetup")
-        embed.add_field(name="Moderation", value="/mod ban /mod kick /mod warn /mod purge")
-        embed.add_field(name="Utility", value="/ping /serverinfo /userinfo /config")
-        await ctx.reply(embed=embed)
-
-    @app_commands.command(name="help")
-    async def help_slash(self, interaction: discord.Interaction) -> None:
-        embed = discord.Embed(title="PURIFY Help", description="Main command dashboard", color=discord.Color.blurple())
-        embed.add_field(name="🛡 Security", value="status, antinuke, antiraidsetup, antilinksetup")
-        embed.add_field(name="🔨 Moderation", value="ban, kick, warn, purge")
-        embed.add_field(name="⚙ Utility", value="ping, serverinfo, userinfo, config")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    @app_commands.command(name="serverinfo")
-    async def serverinfo(self, interaction: discord.Interaction) -> None:
-        guild = interaction.guild
-        if guild is None:
-            await interaction.response.send_message("This command only works in a server.", ephemeral=True)
+    @app_commands.command(name="config", description="View the server PURIFY dashboard")
+    async def config(self, interaction: discord.Interaction) -> None:
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ Administrator permission is required.", ephemeral=True)
             return
-        embed = discord.Embed(title=guild.name, color=discord.Color.blurple())
-        embed.add_field(name="Members", value=str(guild.member_count))
-        embed.add_field(name="Boosts", value=str(guild.premium_subscription_count or 0))
-        embed.add_field(name="Owner", value=str(guild.owner))
+        guild = self.bot.db.get_guild(interaction.guild_id)
+        settings = guild["settings"]
+        embed = discord.Embed(title="🛡️ PURIFY Configuration", color=discord.Color.blurple())
+        embed.add_field(name="Prefix", value=f"`{guild['prefix']}`")
+        embed.add_field(name="Anti-nuke", value=str(settings.get("anti_nuke", "not configured")).title())
+        embed.add_field(name="Anti-raid", value="Enabled" if settings.get("anti_raid") else "Not configured")
+        embed.add_field(name="Anti-link", value="Enabled" if settings.get("anti_link") else "Not configured")
+        embed.add_field(name="Tickets", value="Enabled" if settings.get("ticket_setup") else "Not configured")
+        embed.add_field(name="Logging", value="Enabled" if settings.get("logging_enabled") else "Not configured")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="userinfo")
-    @app_commands.describe(member="The user to inspect")
-    async def userinfo(self, interaction: discord.Interaction, member: discord.Member | None = None) -> None:
-        target = member or interaction.user
-        embed = discord.Embed(title=f"User info: {target}", color=target.color)
-        embed.add_field(name="ID", value=str(target.id))
-        embed.add_field(name="Created", value=target.created_at.strftime("%Y-%m-%d %H:%M:%S UTC"))
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+    @app_commands.command(name="prefix", description="Set the server prefix for prefix commands")
+    @app_commands.describe(prefix="One to five non-space characters")
+    async def prefix(self, interaction: discord.Interaction, prefix: str) -> None:
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ Administrator permission is required.", ephemeral=True)
+            return
+        prefix = prefix.strip()
+        if not prefix or len(prefix) > 5 or any(ch.isspace() for ch in prefix):
+            await interaction.response.send_message("❌ Prefix must be 1–5 non-space characters.", ephemeral=True)
+            return
+        self.bot.db.set_prefix(interaction.guild_id, prefix)
+        await interaction.response.send_message(f"✅ Prefix updated to `{prefix}`.", ephemeral=True)
 
 
 async def setup(bot: commands.Bot) -> None:
-    await bot.add_cog(Utility(bot))
+    await bot.add_cog(Config(bot))

@@ -17,7 +17,7 @@ class Tickets(commands.Cog):
             await interaction.response.send_message("Only administrators can set up ticketing.", ephemeral=True)
             return
         self.bot.db.set_setting(interaction.guild_id, "ticket_setup", True)
-        await interaction.response.send_message("Ticket system is enabled and ready for channel creation.", ephemeral=True)
+        await interaction.response.send_message("✅ Ticket system enabled.", ephemeral=True)
 
     @ticket.command(name="create")
     async def create(self, interaction: discord.Interaction) -> None:
